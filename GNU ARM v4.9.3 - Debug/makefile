@@ -28,35 +28,35 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: STK3700_freertos_tickless_2.axf
+all: HumanDelay.axf
 
 # Tool invocations
-STK3700_freertos_tickless_2.axf: $(OBJS) $(USER_OBJS)
+HumanDelay.axf: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GNU ARM C Linker'
-	arm-none-eabi-gcc -g -gdwarf-2 -mcpu=cortex-m3 -mthumb -T "STK3700_freertos_tickless_2.ld" -Xlinker --gc-sections -Xlinker -Map="STK3700_freertos_tickless_2.map" --specs=nano.specs -o STK3700_freertos_tickless_2.axf "./BSP/bsp_trace.o" "./CMSIS/EFM32GG/startup_efm32gg.o" "./CMSIS/EFM32GG/system_efm32gg.o" "./Drivers/segmentlcd.o" "./Drivers/sleep.o" "./FreeRTOS/efm32gg/croutine.o" "./FreeRTOS/efm32gg/event_groups.o" "./FreeRTOS/efm32gg/heap_1.o" "./FreeRTOS/efm32gg/list.o" "./FreeRTOS/efm32gg/port.o" "./FreeRTOS/efm32gg/queue.o" "./FreeRTOS/efm32gg/tasks.o" "./FreeRTOS/efm32gg/timers.o" "./emlib/em_assert.o" "./emlib/em_burtc.o" "./emlib/em_cmu.o" "./emlib/em_core.o" "./emlib/em_emu.o" "./emlib/em_gpio.o" "./emlib/em_lcd.o" "./emlib/em_rmu.o" "./emlib/em_rtc.o" "./emlib/em_system.o" "./src/low_power_tick_management.o" "./src/main.o" -Wl,--start-group -lgcc -lc -lnosys -Wl,--end-group
+	arm-none-eabi-gcc -g -gdwarf-2 -mcpu=cortex-m3 -mthumb -T "HumanDelay.ld" -Xlinker --gc-sections -Xlinker -Map="HumanDelay.map" --specs=nano.specs -o HumanDelay.axf "./BSP/bsp_trace.o" "./CMSIS/EFM32GG/startup_efm32gg.o" "./CMSIS/EFM32GG/system_efm32gg.o" "./Drivers/segmentlcd.o" "./Drivers/sleep.o" "./FreeRTOS/efm32gg/croutine.o" "./FreeRTOS/efm32gg/event_groups.o" "./FreeRTOS/efm32gg/heap_1.o" "./FreeRTOS/efm32gg/list.o" "./FreeRTOS/efm32gg/port.o" "./FreeRTOS/efm32gg/queue.o" "./FreeRTOS/efm32gg/tasks.o" "./FreeRTOS/efm32gg/timers.o" "./emlib/em_assert.o" "./emlib/em_burtc.o" "./emlib/em_cmu.o" "./emlib/em_core.o" "./emlib/em_emu.o" "./emlib/em_gpio.o" "./emlib/em_lcd.o" "./emlib/em_rmu.o" "./emlib/em_rtc.o" "./emlib/em_system.o" "./emlib/em_timer.o" "./src/low_power_tick_management.o" "./src/main.o" -Wl,--start-group -lgcc -lc -lnosys -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
-	@echo 'Building hex file: STK3700_freertos_tickless_2.hex'
-	arm-none-eabi-objcopy -O ihex "STK3700_freertos_tickless_2.axf" "STK3700_freertos_tickless_2.hex"
+	@echo 'Building hex file: HumanDelay.hex'
+	arm-none-eabi-objcopy -O ihex "HumanDelay.axf" "HumanDelay.hex"
 	@echo ' '
 
-	@echo 'Building bin file: STK3700_freertos_tickless_2.bin'
-	arm-none-eabi-objcopy -O binary "STK3700_freertos_tickless_2.axf" "STK3700_freertos_tickless_2.bin"
+	@echo 'Building bin file: HumanDelay.bin'
+	arm-none-eabi-objcopy -O binary "HumanDelay.axf" "HumanDelay.bin"
 	@echo ' '
 
-	@echo 'Building s37 file: STK3700_freertos_tickless_2.s37'
-	arm-none-eabi-objcopy -O srec "STK3700_freertos_tickless_2.axf" "STK3700_freertos_tickless_2.s37"
+	@echo 'Building s37 file: HumanDelay.s37'
+	arm-none-eabi-objcopy -O srec "HumanDelay.axf" "HumanDelay.s37"
 	@echo ' '
 
 	@echo 'Running size tool'
-	arm-none-eabi-size "STK3700_freertos_tickless_2.axf"
+	arm-none-eabi-size "HumanDelay.axf"
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) STK3700_freertos_tickless_2.axf
+	-$(RM) $(EXECUTABLES)$(OBJS)$(C_DEPS) HumanDelay.axf
 	-@echo ' '
 
 .PHONY: all clean dependents
