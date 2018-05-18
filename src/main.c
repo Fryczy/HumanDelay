@@ -50,6 +50,7 @@ int count = 10;
 int ErrorTime = 0;
 uint8_t SetTime = 10;
 uint32_t Timer0Value;
+volatile uint8_t sec=0;
 
 /* Variable for the Timer */
 TimerHandle_t timer;
@@ -101,65 +102,81 @@ static void Count(void *pParameters) {
 }
 /*static void GPIORead(void *pParameters) {
 
-	if (GPIO_PinInGet(gpioPortB, 8)&& (pdTRUE == xSemaphoreTake(sem, portMAX_DELAY))) {
-		ErrorTime = SetTime - Timer0Value; // Calculate the Delay
-		SegmentLCD_Write(ErrorTime);
-	}
-	else {
-		vTaskDelay(pdMS_TO_TICKS(1000));
-	}
+ if (GPIO_PinInGet(gpioPortB, 8)&& (pdTRUE == xSemaphoreTake(sem, portMAX_DELAY))) {
+ ErrorTime = SetTime - Timer0Value; // Calculate the Delay
+ SegmentLCD_Write(ErrorTime);
+ }
+ else {
+ vTaskDelay(pdMS_TO_TICKS(1000));
+ }
 
-}*/
+ }*/
 void Init_TIMER0(void) {
 	CMU_ClockEnable(cmuClock_TIMER0, true);
-	TIMER_IntEnable(TIMER0,true);
-	TIMER_TopSet(TIMER0,39062); // Count for 512us*39062=19999744us ~20s
+	TIMER_IntEnable(TIMER0, true);
+	TIMER_TopSet(TIMER0, 13672); // Count for 73,1us*13672=0,9994232~1s
 	TIMER_Init_TypeDef timerInit = { .enable = true, .debugRun = true,
 			.prescale = timerPrescale1024, .clkSel = timerClkSelHFPerClk,
 			.fallAction = timerInputActionNone, .riseAction =
 					timerInputActionNone, .mode = timerModeUp, .dmaClrAct =
-					false, .quadModeX4 = false, .oneShot = false, .sync = false,
+			false, .quadModeX4 = false, .oneShot = false, .sync = false,
 
 	};
 	TIMER_Init(TIMER0, &timerInit);
+	NVIC_EnableIRQ(TIMER0_IRQn);
+	TIMER_IntEnable(TIMER0,TIMER_IF_OF);
 
 }
-void Init_GPIO (void){ 			/* Initialize the GPIO */
+void Init_GPIO(void) { /* Initialize the GPIO */
 
-		CMU_ClockEnable(cmuClock_GPIO, true); // Enable GPIO clock
-		GPIO_PinModeSet(gpioPortB, 9, gpioModeInput, 0); // Configure the PB0 button as input
-		NVIC_EnableIRQ(GPIO_EVEN_IRQn); // Enable the IT for the GPIO pins
+	CMU_ClockEnable(cmuClock_GPIO, true); // Enable GPIO clock
+	GPIO_PinModeSet(gpioPortB, 9, gpioModeInput, 0); // Configure the PB0 button as input, it's connected to PB9
+	GPIO_IntConfig(gpioPortB, 9, true, false, true); // Enable rising edge interrrupt for PB0
+	NVIC_EnableIRQ(GPIO_EVEN_IRQn); // Enable the IT for the GPIO pins
 
+	// Enable interrupt in CPU for even and idd gpio ITs
+	NVIC_ClearPendingIRQ(GPIO_EVEN_IRQn);
+	NVIC_EnableIRQ(GPIO_EVEN_IRQn);
+	NVIC_SetPriority(GPIO_EVEN_IRQn, 0);
+
+	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
+	NVIC_EnableIRQ(GPIO_ODD_IRQn);
+	NVIC_SetPriority(GPIO_ODD_IRQn, 0);
 }
-void Init_UART(void){
+void Init_UART(void) {
 	GPIO->P[5].MODEL |= GPIO_P_MODEL_MODE7_PUSHPULL; // Set PF7 high
 	GPIO->P[5].DOUTSET = 1 << 7;
-	CMU_ClockEnable(cmuClock_UART0,true); // Enable UART0 clock
+	CMU_ClockEnable(cmuClock_UART0, true); // Enable UART0 clock
 	USART_InitAsync_TypeDef uart0_init = USART_INITASYNC_DEFAULT; // configure UART0 115200 baudrate, 8N1 format
-		uart0_init.baudrate = 115200;
-		uart0_init.refFreq = 0;
-		uart0_init.databits = usartDatabits8;
-		uart0_init.parity = usartNoParity;
-		uart0_init.stopbits = usartStopbits1;
-		uart0_init.mvdis = false;
-		uart0_init.oversampling = usartOVS16;
-		uart0_init.prsRxEnable = false;
-		uart0_init.prsRxCh = 0;
-		uart0_init.enable = usartEnable;
-		USART_InitAsync(UART0, &uart0_init);
-		GPIO_PinModeSet(gpioPortE, 0, gpioModePushPull, 1);
-		UART0->ROUTE |= USART_ROUTE_TXPEN | USART_ROUTE_RXPEN;
-			UART0->ROUTE |= USART_ROUTE_LOCATION_LOC1;
+	uart0_init.baudrate = 115200;
+	uart0_init.refFreq = 0;
+	uart0_init.databits = usartDatabits8;
+	uart0_init.parity = usartNoParity;
+	uart0_init.stopbits = usartStopbits1;
+	uart0_init.mvdis = false;
+	uart0_init.oversampling = usartOVS16;
+	uart0_init.prsRxEnable = false;
+	uart0_init.prsRxCh = 0;
+	uart0_init.enable = usartEnable;
+	USART_InitAsync(UART0, &uart0_init);
+	GPIO_PinModeSet(gpioPortE, 0, gpioModePushPull, 1);
+	UART0->ROUTE |= USART_ROUTE_TXPEN | USART_ROUTE_RXPEN;
+	UART0->ROUTE |= USART_ROUTE_LOCATION_LOC1;
 }
-void GPIO_EVEN_IRQHandler (void){
-	Timer0Value = TIMER_CounterGet(TIMER0);// read the actual timer value
-	UARTSend ();
+void GPIO_EVEN_IRQHandler(void) {
+	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
+	UARTSend();
+
 }
-void UARTSend (void)
-{
-ErrorTime= (19531-Timer0Value)*512; // The real 0 moment is when the counter reach 19531, here I calculate the difference
-USART_Tx(UART0,ErrorTime); // Send ErrorTime through UART0
+void UARTSend() {
+	ErrorTime = (19531 - Timer0Value) * 512 + sec; // The real 0 moment is when the counter reach 19531, here I calculate the difference
+	USART_Tx(UART0, ErrorTime); // Send ErrorTime through UART0
 }
+ void TIMER0_IRQHandler (void){
+	 TIMER_IntClear(TIMER0,TIMER_IF_OF);
+	 sec++;
+ }
+
 
 /***************************************************************************//**
  * @brief  Main function
@@ -173,7 +190,7 @@ int main(void) {
 	/* If first word of user data page is non-zero, enable Energy Profiler trace */
 	BSP_TraceProfilerSetup();
 
-	/* Initialize SLEEP driver, no calbacks are used */
+	/* Initialize SLEEP driver, no callbacks are used */
 	SLEEP_Init(NULL, NULL);
 #if (configSLEEP_MODE < 3)
 	/* do not let to sleep deeper than define */
