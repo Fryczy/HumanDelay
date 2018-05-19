@@ -166,12 +166,12 @@ void Init_UART(void) {
 
 }
 
-static void Send(void* pvParam) {
+static void Send(void* pvParam) { // send the error values with serial port
 	xSemaphoreTake(sem,portMAX_DELAY);
 	while (1) {
 		printf("%d\n", ErrorTime);
 		xSemaphoreGive(sem);
-		vTaskSuspend(NULL);
+		vTaskSuspend(NULL); // Suspend the Sendd until an GPIO IT occurs
 	}
 }
 void TIMER0_IRQHandler(void) {
@@ -182,7 +182,7 @@ void GPIO_ODD_IRQHandler(void) {
 	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
 	ErrorTime = (Timer0Value * 73.1) + sec;
 	//UARTSend();
-	vTaskResume(handleSend);
+	vTaskResume(handleSend); // Resume Send Task
 	GPIO_IntClear(1 << 9);
 }
 
