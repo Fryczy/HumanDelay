@@ -35,6 +35,7 @@
 #include "em_usart.h"
 #include "em_device.h"
 
+
 #define STACK_SIZE_FOR_TASK    (configMINIMAL_STACK_SIZE + 10)
 #define TASK_PRIORITY          (tskIDLE_PRIORITY + 1)
 #define GPIOREAD_PRIORITY 		(TASK_PRIORITY +1)
@@ -50,10 +51,14 @@ int count = 10;
 int ErrorTime = 0;
 uint8_t SetTime = 10;
 uint32_t Timer0Value;
-volatile uint8_t sec=0;
+volatile uint8_t sec = 0;
 
 /* Variable for the Timer */
 TimerHandle_t timer;
+/*-------------------------------------------------------------
+ * FUNCTION DECLARATIONS
+ --------------------------------------------------------------*/
+void GPIO_ODD_IRQHandler(void);
 /***************************************************************************//**
  * @brief LcdPrint task which is showing numbers on the display
  * @param *pParameters pointer to parameters passed to the function
@@ -102,6 +107,7 @@ static void Count(void *pParameters) {
 }
 /*static void GPIORead(void *pParameters) {
 
+
  if (GPIO_PinInGet(gpioPortB, 8)&& (pdTRUE == xSemaphoreTake(sem, portMAX_DELAY))) {
  ErrorTime = SetTime - Timer0Value; // Calculate the Delay
  SegmentLCD_Write(ErrorTime);
@@ -124,27 +130,25 @@ void Init_TIMER0(void) {
 	};
 	TIMER_Init(TIMER0, &timerInit);
 	NVIC_EnableIRQ(TIMER0_IRQn);
-	TIMER_IntEnable(TIMER0,TIMER_IF_OF);
+	TIMER_IntEnable(TIMER0, TIMER_IF_OF);
 
 }
+
 void Init_GPIO(void) { /* Initialize the GPIO */
 
 	CMU_ClockEnable(cmuClock_GPIO, true); // Enable GPIO clock
 	GPIO_PinModeSet(gpioPortB, 9, gpioModeInput, 0); // Configure the PB0 button as input, it's connected to PB9
-	GPIO_IntConfig(gpioPortB, 9, true, false, true); // Enable rising edge interrrupt for PB0
+	GPIO_IntConfig(gpioPortB, 9, true, false, true); // Enable rising edge interrupt for PB0
+	NVIC_ClearPendingIRQ (GPIO_ODD_IRQn);
 	NVIC_EnableIRQ(GPIO_EVEN_IRQn); // Enable the IT for the GPIO pins
-
-	// Enable interrupt in CPU for even and idd gpio ITs
-	NVIC_ClearPendingIRQ(GPIO_EVEN_IRQn);
-	NVIC_EnableIRQ(GPIO_EVEN_IRQn);
-	NVIC_SetPriority(GPIO_EVEN_IRQn, 0);
-
+	// Enable interrupt in CPU for odd gpio ITs
 	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
 	NVIC_EnableIRQ(GPIO_ODD_IRQn);
 	NVIC_SetPriority(GPIO_ODD_IRQn, 0);
+
 }
 void Init_UART(void) {
-	//CMU->HFPERCLKEN0 |= CMU_HFPERCLKEN0_GPIO;
+
 	GPIO->P[5].MODEL |= GPIO_P_MODEL_MODE7_PUSHPULL; // Set PF7 high
 	GPIO->P[5].DOUTSET = 1 << 7;
 	CMU_ClockEnable(cmuClock_UART0, true); // Enable UART0 clock
@@ -165,21 +169,20 @@ void Init_UART(void) {
 	UART0->ROUTE |= USART_ROUTE_LOCATION_LOC1;
 
 }
-void GPIO_EVEN_IRQHandler(void) {
-	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
-	UARTSend();
 
-}
 void UARTSend() {
 	ErrorTime = (19531 - Timer0Value) * 512 + sec; // The real 0 moment is when the counter reach 19531, here I calculate the difference
 	USART_Tx(UART0, ErrorTime); // Send ErrorTime through UART0
 }
- void TIMER0_IRQHandler (void){
-	 TIMER_IntClear(TIMER0,TIMER_IF_OF);
-
-	 sec++;
- }
-
+void TIMER0_IRQHandler(void) {
+	TIMER_IntClear(TIMER0, TIMER_IF_OF);
+	sec++;
+}
+void GPIO_ODD_IRQHandler (void){
+	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
+		UARTSend();
+		GPIO_IntClear(1<<9);
+}
 
 /***************************************************************************//**
  * @brief  Main function
@@ -188,17 +191,16 @@ void UARTSend() {
 int main(void) {
 	/* Chip errata */
 	CHIP_Init();
-	//CMU_HFRCOBandSet(cmuAUXHFRCOBand_14MHz); // Set High Freq. RC Oscilaator to 14 MHz
 
 	/* If first word of user data page is non-zero, enable Energy Profiler trace */
 	BSP_TraceProfilerSetup();
 
 	/* Initialize SLEEP driver, no callbacks are used */
-	SLEEP_Init(NULL, NULL);
+	/* SLEEP_Init(NULL, NULL);
 #if (configSLEEP_MODE < 3)
-	/* do not let to sleep deeper than define */
+	 do not let to sleep deeper than define
 	SLEEP_SleepBlockBegin((SLEEP_EnergyMode_t) (configSLEEP_MODE + 1));
-#endif
+#endif */
 
 	/* Initialize the LCD driver */
 	SegmentLCD_Init(false);

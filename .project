@@ -36,11 +36,6 @@
 			<locationURI>STUDIO_SDK_LOC/hardware/kit/common/drivers/segmentlcd.c</locationURI>
 		</link>
 		<link>
-			<name>Drivers/sleep.c</name>
-			<type>1</type>
-			<locationURI>STUDIO_SDK_LOC/platform/emdrv/sleep/src/sleep.c</locationURI>
-		</link>
-		<link>
 			<name>emlib/em_assert.c</name>
 			<type>1</type>
 			<locationURI>STUDIO_SDK_LOC/platform/emlib/src/em_assert.c</locationURI>
