@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <retargetserial.h>
 
 #include "FreeRTOSConfig.h"
 #include "FreeRTOS.h"
@@ -35,10 +36,11 @@
 #include "em_usart.h"
 #include "em_device.h"
 
-
 #define STACK_SIZE_FOR_TASK    (configMINIMAL_STACK_SIZE + 10)
-#define TASK_PRIORITY          (tskIDLE_PRIORITY + 1)
-#define GPIOREAD_PRIORITY 		(TASK_PRIORITY +1)
+#define COUNT_PRIORITY          (tskIDLE_PRIORITY + 2)
+#define LCDPRINT_PRIORITY		(tskIDLE_PRIORITY+3)
+#define SEND_PRIORITY			(tskIDLE_PRIORITY+1)
+
 /*-------------------------------------------------------
  VARIABLES
  --------------------------------------------------------*/
@@ -52,13 +54,8 @@ int ErrorTime = 0;
 uint8_t SetTime = 10;
 uint32_t Timer0Value;
 volatile uint8_t sec = 0;
+TaskHandle_t handleSend;
 
-/* Variable for the Timer */
-TimerHandle_t timer;
-/*-------------------------------------------------------------
- * FUNCTION DECLARATIONS
- --------------------------------------------------------------*/
-void GPIO_ODD_IRQHandler(void);
 /***************************************************************************//**
  * @brief LcdPrint task which is showing numbers on the display
  * @param *pParameters pointer to parameters passed to the function
@@ -84,7 +81,6 @@ static void LcdPrint(void *pParameters) {
 
 static void Count(void *pParameters) {
 	(void) pParameters; /* to quiet warnings */
-
 	for (;;) {
 		if (count <= 4) {
 			text[0] = 'W';
@@ -139,7 +135,7 @@ void Init_GPIO(void) { /* Initialize the GPIO */
 	CMU_ClockEnable(cmuClock_GPIO, true); // Enable GPIO clock
 	GPIO_PinModeSet(gpioPortB, 9, gpioModeInput, 0); // Configure the PB0 button as input, it's connected to PB9
 	GPIO_IntConfig(gpioPortB, 9, true, false, true); // Enable rising edge interrupt for PB0
-	NVIC_ClearPendingIRQ (GPIO_ODD_IRQn);
+	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
 	NVIC_EnableIRQ(GPIO_EVEN_IRQn); // Enable the IT for the GPIO pins
 	// Enable interrupt in CPU for odd gpio ITs
 	NVIC_ClearPendingIRQ(GPIO_ODD_IRQn);
@@ -170,18 +166,24 @@ void Init_UART(void) {
 
 }
 
-void UARTSend() {
-	ErrorTime = (19531 - Timer0Value) * 512 + sec; // The real 0 moment is when the counter reach 19531, here I calculate the difference
-	USART_Tx(UART0, ErrorTime); // Send ErrorTime through UART0
+static void Send(void* pvParam) {
+	xSemaphoreTake(sem,portMAX_DELAY);
+	while (1) {
+		printf("%d\n", ErrorTime);
+		xSemaphoreGive(sem);
+		vTaskSuspend(NULL);
+	}
 }
 void TIMER0_IRQHandler(void) {
 	TIMER_IntClear(TIMER0, TIMER_IF_OF);
 	sec++;
 }
-void GPIO_ODD_IRQHandler (void){
+void GPIO_ODD_IRQHandler(void) {
 	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
-		UARTSend();
-		GPIO_IntClear(1<<9);
+	ErrorTime = (Timer0Value * 73.1) + sec;
+	//UARTSend();
+	vTaskResume(handleSend);
+	GPIO_IntClear(1 << 9);
 }
 
 /***************************************************************************//**
@@ -196,11 +198,13 @@ int main(void) {
 	BSP_TraceProfilerSetup();
 
 	/* Initialize SLEEP driver, no callbacks are used */
-	/* SLEEP_Init(NULL, NULL);
+	SLEEP_Init(NULL, NULL);
 #if (configSLEEP_MODE < 3)
-	 do not let to sleep deeper than define
+	//do not let to sleep deeper than define
 	SLEEP_SleepBlockBegin((SLEEP_EnergyMode_t) (configSLEEP_MODE + 1));
-#endif */
+#endif
+	RETARGET_SerialInit();
+	RETARGET_SerialCrLf(1);
 
 	/* Initialize the LCD driver */
 	SegmentLCD_Init(false);
@@ -213,11 +217,12 @@ int main(void) {
 	vSemaphoreCreateBinary(sem);
 
 	/* Create two task to show numbers from 10 to 4 */
-	//xTaskCreate(GPIORead,(const char *)"GPIORead", STACK_SIZE_FOR_TASK, NULL,TASK_PRIORITY ,NULL);
+	xTaskCreate(Send, (const char *) "Send", STACK_SIZE_FOR_TASK, NULL,
+	SEND_PRIORITY, NULL);
 	xTaskCreate(Count, (const char *) "Count", STACK_SIZE_FOR_TASK, NULL,
-	TASK_PRIORITY, NULL);
+	COUNT_PRIORITY, NULL);
 	xTaskCreate(LcdPrint, (const char *) "LcdPrint", STACK_SIZE_FOR_TASK,
-	NULL, TASK_PRIORITY, NULL);
+	NULL, LCDPRINT_PRIORITY, NULL);
 
 	/* // Create the timer of the Delay Counter
 	 timer = xTimerCreate("Delay",pdMS_TO_TICKS(20000),pdFALSE,(void*)NULL,GPIORead); */
