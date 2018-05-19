@@ -144,6 +144,7 @@ void Init_GPIO(void) { /* Initialize the GPIO */
 	NVIC_SetPriority(GPIO_ODD_IRQn, 0);
 }
 void Init_UART(void) {
+	//CMU->HFPERCLKEN0 |= CMU_HFPERCLKEN0_GPIO;
 	GPIO->P[5].MODEL |= GPIO_P_MODEL_MODE7_PUSHPULL; // Set PF7 high
 	GPIO->P[5].DOUTSET = 1 << 7;
 	CMU_ClockEnable(cmuClock_UART0, true); // Enable UART0 clock
@@ -162,6 +163,7 @@ void Init_UART(void) {
 	GPIO_PinModeSet(gpioPortE, 0, gpioModePushPull, 1);
 	UART0->ROUTE |= USART_ROUTE_TXPEN | USART_ROUTE_RXPEN;
 	UART0->ROUTE |= USART_ROUTE_LOCATION_LOC1;
+
 }
 void GPIO_EVEN_IRQHandler(void) {
 	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
@@ -174,6 +176,7 @@ void UARTSend() {
 }
  void TIMER0_IRQHandler (void){
 	 TIMER_IntClear(TIMER0,TIMER_IF_OF);
+
 	 sec++;
  }
 
@@ -185,7 +188,7 @@ void UARTSend() {
 int main(void) {
 	/* Chip errata */
 	CHIP_Init();
-	CMU_HFRCOBandSet(cmuAUXHFRCOBand_14MHz); // Set High Freq. RC Oscilaator to 1 MHz
+	//CMU_HFRCOBandSet(cmuAUXHFRCOBand_14MHz); // Set High Freq. RC Oscilaator to 14 MHz
 
 	/* If first word of user data page is non-zero, enable Energy Profiler trace */
 	BSP_TraceProfilerSetup();
