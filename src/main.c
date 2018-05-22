@@ -37,8 +37,8 @@
 #include "em_device.h"
 
 #define STACK_SIZE_FOR_TASK    (configMINIMAL_STACK_SIZE + 10)
-#define COUNT_PRIORITY          (tskIDLE_PRIORITY + 2)
-#define LCDPRINT_PRIORITY		(tskIDLE_PRIORITY+3)
+#define COUNT_PRIORITY          (tskIDLE_PRIORITY+2)
+#define LCDPRINT_PRIORITY		(tskIDLE_PRIORITY+2)
 #define SEND_PRIORITY			(tskIDLE_PRIORITY+1)
 
 /*-------------------------------------------------------
@@ -55,6 +55,8 @@ uint8_t SetTime = 10;
 uint32_t Timer0Value;
 volatile uint8_t sec = 0;
 TaskHandle_t handleSend;
+TaskHandle_t handleLCDPrint;
+TaskHandle_t handleCount;
 
 /***************************************************************************//**
  * @brief LcdPrint task which is showing numbers on the display
@@ -89,7 +91,7 @@ static void Count(void *pParameters) {
 			text[4] = 'T';
 			text[5] = '\0';
 			xSemaphoreGive(sem);
-			vTaskDelay(pdMS_TO_TICKS(1000));
+			vTaskSuspend(NULL);
 		} else {
 
 			count = (count - 1);
@@ -98,21 +100,11 @@ static void Count(void *pParameters) {
 			text[2] = '\0';
 			xSemaphoreGive(sem);
 			vTaskDelay(pdMS_TO_TICKS(1000));
+
 		}
 	}
 }
-/*static void GPIORead(void *pParameters) {
 
-
- if (GPIO_PinInGet(gpioPortB, 8)&& (pdTRUE == xSemaphoreTake(sem, portMAX_DELAY))) {
- ErrorTime = SetTime - Timer0Value; // Calculate the Delay
- SegmentLCD_Write(ErrorTime);
- }
- else {
- vTaskDelay(pdMS_TO_TICKS(1000));
- }
-
- }*/
 void Init_TIMER0(void) {
 	CMU_ClockEnable(cmuClock_TIMER0, true);
 	TIMER_IntEnable(TIMER0, true);
@@ -143,7 +135,7 @@ void Init_GPIO(void) { /* Initialize the GPIO */
 	NVIC_SetPriority(GPIO_ODD_IRQn, 0);
 
 }
-void Init_UART(void) {
+/*void Init_UART(void) {
 
 	GPIO->P[5].MODEL |= GPIO_P_MODEL_MODE7_PUSHPULL; // Set PF7 high
 	GPIO->P[5].DOUTSET = 1 << 7;
@@ -164,14 +156,12 @@ void Init_UART(void) {
 	UART0->ROUTE |= USART_ROUTE_TXPEN | USART_ROUTE_RXPEN;
 	UART0->ROUTE |= USART_ROUTE_LOCATION_LOC1;
 
-}
+}*/
 
 static void Send(void* pvParam) { // send the error values with serial port
-	xSemaphoreTake(sem,portMAX_DELAY);
 	while (1) {
 		printf("%d\n", ErrorTime);
-		xSemaphoreGive(sem);
-		vTaskSuspend(NULL); // Suspend the Sendd until an GPIO IT occurs
+		//vTaskSuspend(NULL); // Suspend the Sendd until an GPIO IT occurs
 	}
 }
 void TIMER0_IRQHandler(void) {
@@ -182,7 +172,9 @@ void GPIO_ODD_IRQHandler(void) {
 	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
 	ErrorTime = (Timer0Value * 73.1) + sec;
 	//UARTSend();
-	vTaskResume(handleSend); // Resume Send Task
+	//vTaskResume(handleSend); // Resume Send Task
+	printf("%d",ErrorTime);
+	vTaskResume(handleCount);
 	GPIO_IntClear(1 << 9);
 }
 
@@ -211,16 +203,16 @@ int main(void) {
 	/* Initialize TIMER0 */
 	Init_TIMER0();
 	Init_GPIO(); // Initialize GPIO Pin PB8 (Push-Button0 )
-	Init_UART(); // Initialize UART0
+	//Init_UART(); // Initialize UART0
 	/* Create standard binary semaphore */
 
 	vSemaphoreCreateBinary(sem);
 
 	/* Create two task to show numbers from 10 to 4 */
 	xTaskCreate(Send, (const char *) "Send", STACK_SIZE_FOR_TASK, NULL,
-	SEND_PRIORITY, NULL);
+	SEND_PRIORITY, &handleSend);
 	xTaskCreate(Count, (const char *) "Count", STACK_SIZE_FOR_TASK, NULL,
-	COUNT_PRIORITY, NULL);
+	COUNT_PRIORITY, &handleCount);
 	xTaskCreate(LcdPrint, (const char *) "LcdPrint", STACK_SIZE_FOR_TASK,
 	NULL, LCDPRINT_PRIORITY, NULL);
 
