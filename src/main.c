@@ -13,9 +13,9 @@
  *
  ******************************************************************************/
 
-#include <stdio.h>
+#include "stdio.h"
 #include <stdlib.h>
-#include <retargetserial.h>
+#include "retargetserial.h"
 
 #include "FreeRTOSConfig.h"
 #include "FreeRTOS.h"
@@ -45,13 +45,14 @@ xSemaphoreHandle sem;
 char text[8];
 /* Counter start value*/
 int count = 10;
-volatile int ErrorTime = 0;
+volatile float ErrorTime = 0;
 uint8_t SetTime = 10;
 volatile uint32_t Timer0Value;
-volatile uint8_t sec = 0;
+volatile float sec = 0;
 //TaskHandle_t handleSend;
 TaskHandle_t handleLCDPrint;
 TaskHandle_t handleCount;
+
 
 /***************************************************************************//**
  * @brief LcdPrint task which is showing numbers on the display
@@ -126,16 +127,19 @@ void Init_GPIO(void) { /* Initialize the GPIO */
 	NVIC_SetPriority(GPIO_ODD_IRQn, 0);
 
 }
+
 void TIMER0_IRQHandler(void) {
-	TIMER_IntClear(TIMER0, TIMER_IF_OF);
 	sec++;
+	TIMER_IntClear(TIMER0, TIMER_IF_OF);
 }
 void GPIO_ODD_IRQHandler(void) {
 	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
-	ErrorTime = (Timer0Value / 73.1) + sec;
+	ErrorTime=Timer0Value*0.0000000731;
+	ErrorTime = 10-(ErrorTime+sec);
+
 	//UARTSend();
 	//vTaskResume(handleSend); // Resume Send Task
-	printf("%d", ErrorTime);
+	printf("%f",ErrorTime);
 	//vTaskResume(handleCount);
 	GPIO_IntClear(1 << 9);
 }
@@ -147,8 +151,8 @@ int main(void) {
 	CHIP_Init();
 	Init_GPIO();
 	Init_TIMER0();
-	/*RETARGET_SerialInit();
-	RETARGET_SerialCrLf(1);*/
+	RETARGET_SerialInit();
+	RETARGET_SerialCrLf(1);
 	/* If first word of user data page is non-zero, enable Energy Profiler trace */
 	BSP_TraceProfilerSetup();
 
@@ -167,9 +171,9 @@ int main(void) {
 
 	/* Create two task to show numbers from 0 to 15 */
 	xTaskCreate(Count, (const char *) "Count", STACK_SIZE_FOR_TASK, NULL,
-			TASK_PRIORITY, NULL);
+	TASK_PRIORITY, NULL);
 	xTaskCreate(LcdPrint, (const char *) "LcdPrint", STACK_SIZE_FOR_TASK, NULL,
-			TASK_PRIORITY, NULL);
+	TASK_PRIORITY, NULL);
 
 	/* Start FreeRTOS Scheduler */
 	vTaskStartScheduler();
