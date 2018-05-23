@@ -36,14 +36,9 @@
 #include "em_usart.h"
 #include "em_device.h"
 
-#define STACK_SIZE_FOR_TASK    (configMINIMAL_STACK_SIZE + 20)
-#define COUNT_PRIORITY          (tskIDLE_PRIORITY+1)
-#define LCDPRINT_PRIORITY		(tskIDLE_PRIORITY+1)
-//#define SEND_PRIORITY			(tskIDLE_PRIORITY+1)
+#define STACK_SIZE_FOR_TASK    (configMINIMAL_STACK_SIZE + 10)
+#define TASK_PRIORITY          (tskIDLE_PRIORITY + 1)
 
-/*-------------------------------------------------------
- VARIABLES
- --------------------------------------------------------*/
 /* Semaphores used by application to synchronize two tasks */
 xSemaphoreHandle sem;
 /* Text to display */
@@ -62,17 +57,13 @@ TaskHandle_t handleCount;
  * @brief LcdPrint task which is showing numbers on the display
  * @param *pParameters pointer to parameters passed to the function
  ******************************************************************************/
-/*----------------------------------------------------------
- FUNCTION DEFINITIONS
- */
-static void LcdPrint(void *pvParam) {
-	//(void) pParameters; /* to quiet warnings */
+static void LcdPrint(void *pParameters) {
+	(void) pParameters; /* to quiet warnings */
 
 	for (;;) {
 		/* Wait for semaphore, then display next number */
 		if (pdTRUE == xSemaphoreTake(sem, portMAX_DELAY)) {
 			SegmentLCD_Write(text);
-
 		}
 	}
 }
@@ -81,9 +72,9 @@ static void LcdPrint(void *pvParam) {
  * @brief Count task which is preparing next number to display
  * @param *pParameters pointer to parameters passed to the function
  ******************************************************************************/
+static void Count(void *pParameters) {
+	(void) pParameters; /* to quiet warnings */
 
-static void Count(void *pvParam) {
-	//(void) pParameters; /* to quiet warnings */
 	for (;;) {
 		if (count <= 4) {
 			text[0] = 'W';
@@ -101,11 +92,10 @@ static void Count(void *pvParam) {
 			text[2] = '\0';
 			xSemaphoreGive(sem);
 			vTaskDelay(pdMS_TO_TICKS(1000));
-
+			//vTaskDelayUntil(&LastWakeTime,TikcFreq);
 		}
 	}
 }
-
 void Init_TIMER0(void) {
 	CMU_ClockEnable(cmuClock_TIMER0, true);
 	TIMER_IntEnable(TIMER0, true);
@@ -136,88 +126,50 @@ void Init_GPIO(void) { /* Initialize the GPIO */
 	NVIC_SetPriority(GPIO_ODD_IRQn, 0);
 
 }
-/*void Init_UART(void) {
-
- GPIO->P[5].MODEL |= GPIO_P_MODEL_MODE7_PUSHPULL; // Set PF7 high
- GPIO->P[5].DOUTSET = 1 << 7;
- CMU_ClockEnable(cmuClock_UART0, true); // Enable UART0 clock
- USART_InitAsync_TypeDef uart0_init = USART_INITASYNC_DEFAULT; // configure UART0 115200 baudrate, 8N1 format
- uart0_init.baudrate = 115200;
- uart0_init.refFreq = 0;
- uart0_init.databits = usartDatabits8;
- uart0_init.parity = usartNoParity;
- uart0_init.stopbits = usartStopbits1;
- uart0_init.mvdis = false;
- uart0_init.oversampling = usartOVS16;
- uart0_init.prsRxEnable = false;
- uart0_init.prsRxCh = 0;
- uart0_init.enable = usartEnable;
- USART_InitAsync(UART0, &uart0_init);
- GPIO_PinModeSet(gpioPortE, 0, gpioModePushPull, 1);
- UART0->ROUTE |= USART_ROUTE_TXPEN | USART_ROUTE_RXPEN;
- UART0->ROUTE |= USART_ROUTE_LOCATION_LOC1;
-
- }*/
-
-/*static void Send(void* pvParam) { // send the error values with serial port
- while (1) {
- printf("%d\n", ErrorTime);
- //vTaskSuspend(NULL); // Suspend the Sendd until an GPIO IT occurs
- }
- }*/
 void TIMER0_IRQHandler(void) {
 	TIMER_IntClear(TIMER0, TIMER_IF_OF);
 	sec++;
 }
 void GPIO_ODD_IRQHandler(void) {
 	Timer0Value = TIMER_CounterGet(TIMER0); // read the actual timer value
-	ErrorTime = (Timer0Value * 73.1) + sec;
+	ErrorTime = (Timer0Value / 73.1) + sec;
 	//UARTSend();
 	//vTaskResume(handleSend); // Resume Send Task
-	printf("%d",ErrorTime);
+	printf("%d", ErrorTime);
 	//vTaskResume(handleCount);
 	GPIO_IntClear(1 << 9);
 }
-
 /***************************************************************************//**
  * @brief  Main function
  ******************************************************************************/
-
 int main(void) {
 	/* Chip errata */
 	CHIP_Init();
-
+	Init_GPIO();
+	Init_TIMER0();
+	/*RETARGET_SerialInit();
+	RETARGET_SerialCrLf(1);*/
 	/* If first word of user data page is non-zero, enable Energy Profiler trace */
 	BSP_TraceProfilerSetup();
 
-	/* Initialize SLEEP driver, no callbacks are used */
+	/* Initialize SLEEP driver, no calbacks are used */
 	SLEEP_Init(NULL, NULL);
 #if (configSLEEP_MODE < 3)
-	//do not let to sleep deeper than define
+	/* do not let to sleep deeper than define */
 	SLEEP_SleepBlockBegin((SLEEP_EnergyMode_t) (configSLEEP_MODE + 1));
 #endif
-	RETARGET_SerialInit();
-	RETARGET_SerialCrLf(1);
 
 	/* Initialize the LCD driver */
 	SegmentLCD_Init(false);
-	/* Initialize TIMER0 */
-	Init_TIMER0();
-	Init_GPIO(); // Initialize GPIO Pin PB8 (Push-Button0 )
-	//Init_UART(); // Initialize UART0
+
 	/* Create standard binary semaphore */
 	vSemaphoreCreateBinary(sem);
 
-	/* Create two task to show numbers from 10 to 4 */
-	/*xTaskCreate(Send, (const char *) "Send", STACK_SIZE_FOR_TASK, NULL,
-	 SEND_PRIORITY, &handleSend);*/
+	/* Create two task to show numbers from 0 to 15 */
 	xTaskCreate(Count, (const char *) "Count", STACK_SIZE_FOR_TASK, NULL,
-	COUNT_PRIORITY, &handleCount);
-	xTaskCreate(LcdPrint, (const char *) "LcdPrint", STACK_SIZE_FOR_TASK,
-	NULL, LCDPRINT_PRIORITY, NULL);
-
-	/* // Create the timer of the Delay Counter
-	 timer = xTimerCreate("Delay",pdMS_TO_TICKS(20000),pdFALSE,(void*)NULL,GPIORead); */
+			TASK_PRIORITY, NULL);
+	xTaskCreate(LcdPrint, (const char *) "LcdPrint", STACK_SIZE_FOR_TASK, NULL,
+			TASK_PRIORITY, NULL);
 
 	/* Start FreeRTOS Scheduler */
 	vTaskStartScheduler();

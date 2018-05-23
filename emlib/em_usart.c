@@ -2,10 +2,10 @@
  * @file em_usart.c
  * @brief Universal synchronous/asynchronous receiver/transmitter (USART/UART)
  *   Peripheral API
- * @version 5.4.0
+ * @version 5.2.2
  *******************************************************************************
  * # License
- * <b>Copyright 2016 Silicon Laboratories, Inc. www.silabs.com</b>
+ * <b>Copyright 2016 Silicon Laboratories, Inc. http://www.silabs.com</b>
  *******************************************************************************
  *
  * Permission is granted to anyone to use this software for any purpose,
@@ -97,18 +97,6 @@
 #define USARTRF_REF_VALID(ref)  (0)
 #endif
 
-#if defined(_SILICON_LABS_32B_SERIES_1)
-#if defined(_SILICON_LABS_GECKO_INTERNAL_SDID_100) || defined(_SILICON_LABS_GECKO_INTERNAL_SDID_103)
-// If GG11 or TG11
-#define USART_IRDA_VALID(ref)    (((ref) == USART0) || ((ref) == USART2))
-#elif defined(USART3)
-#define USART_IRDA_VALID(ref)    (((ref) == USART0) || ((ref) == USART1) || ((ref) == USART2) || ((ref) == USART3))
-#elif defined(USART2)
-#define USART_IRDA_VALID(ref)    (((ref) == USART0) || ((ref) == USART1) || ((ref) == USART2))
-#else
-#define USART_IRDA_VALID(ref)    (((ref) == USART0) || ((ref) == USART1))
-#endif
-#elif defined(_SILICON_LABS_32B_SERIES_0)
 #if defined(_EZR32_HAPPY_FAMILY)
 #define USART_IRDA_VALID(ref)    ((ref) == USART0)
 #elif defined(_EFM32_HAPPY_FAMILY)
@@ -122,25 +110,22 @@
 #else
 #define USART_IRDA_VALID(ref)    (0)
 #endif
-#endif
 
 #if defined(_SILICON_LABS_32B_SERIES_1)
-#if defined(USART4)
-#define USART_I2S_VALID(ref)    (((ref) == USART1) || ((ref) == USART3) || ((ref) == USART4))
-#elif defined(USART3)
-#define USART_I2S_VALID(ref)    (((ref) == USART1) || ((ref) == USART3))
-#else
-#define USART_I2S_VALID(ref)    ((ref) == USART1)
-#endif
+  #if defined(USART3)
+  #define USART_I2S_VALID(ref)    (((ref) == USART1) || ((ref) == USART3))
+  #else
+  #define USART_I2S_VALID(ref)    ((ref) == USART1)
+  #endif
 #elif defined(_SILICON_LABS_32B_SERIES_0)
-#if defined(_EZR32_HAPPY_FAMILY)
-#define USART_I2S_VALID(ref)    ((ref) == USART0)
-#elif defined(_EFM32_HAPPY_FAMILY)
-#define USART_I2S_VALID(ref)    (((ref) == USART0) || ((ref) == USART1))
-#elif defined(_EFM32_TINY_FAMILY) || defined(_EFM32_ZERO_FAMILY)
-#define USART_I2S_VALID(ref)    ((ref) == USART1)
-#elif defined(_EFM32_GIANT_FAMILY) || defined(_EFM32_WONDER_FAMILY)
-#define USART_I2S_VALID(ref)    (((ref) == USART1) || ((ref) == USART2))
+  #if defined(_EZR32_HAPPY_FAMILY)
+  #define USART_I2S_VALID(ref)    ((ref) == USART0)
+  #elif defined(_EFM32_HAPPY_FAMILY)
+  #define USART_I2S_VALID(ref)    (((ref) == USART0) || ((ref) == USART1))
+  #elif defined(_EFM32_TINY_FAMILY) || defined(_EFM32_ZERO_FAMILY)
+  #define USART_I2S_VALID(ref)    ((ref) == USART1)
+  #elif defined(_EFM32_GIANT_FAMILY) || defined(_EFM32_WONDER_FAMILY)
+  #define USART_I2S_VALID(ref)    (((ref) == USART1) || ((ref) == USART2))
 #endif
 #endif
 
@@ -612,12 +597,6 @@ void USART_InitAsync(USART_TypeDef *usart, const USART_InitAsync_TypeDef *init)
     usart->CTRL |= USART_CTRL_AUTOCS;
   }
 #endif
-
-#if defined(_USART_ROUTEPEN_RTSPEN_MASK) && defined(_USART_ROUTEPEN_CTSPEN_MASK)
-  usart->ROUTEPEN &= ~(_USART_ROUTEPEN_RTSPEN_MASK | _USART_ROUTEPEN_CTSPEN_MASK);
-  usart->ROUTEPEN |= init->hwFlowControl;
-#endif
-
   /* Finally enable (as specified) */
   usart->CMD = (uint32_t)init->enable;
 }
@@ -742,8 +721,8 @@ void USARTn_InitIrDA(USART_TypeDef *usart, const USART_InitIrDA_TypeDef *init)
   /* Configure IrDA */
   usart->IRCTRL |= (uint32_t)init->irPw
                    | (uint32_t)init->irPrsSel
-                   | ((init->irFilt ? 1UL : 0UL) << _USART_IRCTRL_IRFILT_SHIFT)
-                   | ((init->irPrsEn ? 1UL : 0UL) << _USART_IRCTRL_IRPRSEN_SHIFT);
+                   | ((uint32_t)init->irFilt << _USART_IRCTRL_IRFILT_SHIFT)
+                   | ((uint32_t)init->irPrsEn << _USART_IRCTRL_IRPRSEN_SHIFT);
 
   /* Enable IrDA */
   usart->IRCTRL |= USART_IRCTRL_IREN;
@@ -918,8 +897,8 @@ void USART_Reset(USART_TypeDef *usart)
  ******************************************************************************/
 uint8_t USART_Rx(USART_TypeDef *usart)
 {
-  while (!(usart->STATUS & USART_STATUS_RXDATAV)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_RXDATAV))
+    ;
 
   return (uint8_t)usart->RXDATA;
 }
@@ -950,8 +929,8 @@ uint8_t USART_Rx(USART_TypeDef *usart)
  ******************************************************************************/
 uint16_t USART_RxDouble(USART_TypeDef *usart)
 {
-  while (!(usart->STATUS & USART_STATUS_RXFULL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_RXFULL))
+    ;
 
   return (uint16_t)usart->RXDOUBLE;
 }
@@ -982,8 +961,8 @@ uint16_t USART_RxDouble(USART_TypeDef *usart)
  ******************************************************************************/
 uint32_t USART_RxDoubleExt(USART_TypeDef *usart)
 {
-  while (!(usart->STATUS & USART_STATUS_RXFULL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_RXFULL))
+    ;
 
   return usart->RXDOUBLEX;
 }
@@ -1014,8 +993,8 @@ uint32_t USART_RxDoubleExt(USART_TypeDef *usart)
  ******************************************************************************/
 uint16_t USART_RxExt(USART_TypeDef *usart)
 {
-  while (!(usart->STATUS & USART_STATUS_RXDATAV)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_RXDATAV))
+    ;
 
   return (uint16_t)usart->RXDATAX;
 }
@@ -1041,11 +1020,11 @@ uint16_t USART_RxExt(USART_TypeDef *usart)
  ******************************************************************************/
 uint8_t USART_SpiTransfer(USART_TypeDef *usart, uint8_t data)
 {
-  while (!(usart->STATUS & USART_STATUS_TXBL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_TXBL))
+    ;
   usart->TXDATA = (uint32_t)data;
-  while (!(usart->STATUS & USART_STATUS_TXC)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_TXC))
+    ;
   return (uint8_t)usart->RXDATA;
 }
 
@@ -1075,8 +1054,8 @@ uint8_t USART_SpiTransfer(USART_TypeDef *usart, uint8_t data)
 void USART_Tx(USART_TypeDef *usart, uint8_t data)
 {
   /* Check that transmit buffer is empty */
-  while (!(usart->STATUS & USART_STATUS_TXBL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_TXBL))
+    ;
   usart->TXDATA = (uint32_t)data;
 }
 
@@ -1110,8 +1089,8 @@ void USART_Tx(USART_TypeDef *usart, uint8_t data)
 void USART_TxDouble(USART_TypeDef *usart, uint16_t data)
 {
   /* Check that transmit buffer is empty */
-  while (!(usart->STATUS & USART_STATUS_TXBL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_TXBL))
+    ;
   usart->TXDOUBLE = (uint32_t)data;
 }
 
@@ -1145,8 +1124,8 @@ void USART_TxDouble(USART_TypeDef *usart, uint16_t data)
 void USART_TxDoubleExt(USART_TypeDef *usart, uint32_t data)
 {
   /* Check that transmit buffer is empty */
-  while (!(usart->STATUS & USART_STATUS_TXBL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_TXBL))
+    ;
   usart->TXDOUBLEX = data;
 }
 
@@ -1172,8 +1151,8 @@ void USART_TxDoubleExt(USART_TypeDef *usart, uint32_t data)
 void USART_TxExt(USART_TypeDef *usart, uint16_t data)
 {
   /* Check that transmit buffer is empty */
-  while (!(usart->STATUS & USART_STATUS_TXBL)) {
-  }
+  while (!(usart->STATUS & USART_STATUS_TXBL))
+    ;
   usart->TXDATAX = (uint32_t)data;
 }
 
